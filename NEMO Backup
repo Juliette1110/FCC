@@ -21,7 +21,7 @@ from spacy.lang.en import English
 
 nltk.download('stopwords')
 nltk.download('wordnet')
-spacy.load('en')
+spacy.load('en_core_web_sm')
 
 
 
@@ -66,7 +66,7 @@ FROM_EMAIL  = "jburcham" + ORG_EMAIL
 FROM_PWD    = password = input("please enter password:") #logging on
 SMTP_SERVER = "imap.gmail.com" #import gmail
 SMTP_PORT   = 993
- #establish cennection to email server
+#establish cennection to email server
 mail = imaplib.IMAP4_SSL(SMTP_SERVER)
 mail.login(FROM_EMAIL,FROM_PWD)
 
@@ -90,20 +90,14 @@ print("ONE")
 hat=[]
 for i in range(latest_email_id,latest_email_id-100, -1):
 	typ, data = mail.fetch(str(i), '(RFC822)' )
-	print("TWO")
+	#print("TWO")
 	for response_part in data:
 		if isinstance(response_part, tuple):
-                 
                     msg = email.message_from_string(response_part[1].decode("utf-8",'ignore') )
-                    
-                    #for part in msg.get_payload():
                     for part in msg.walk():
                       if part.get_content_type() == 'text/plain':
-                        print (part.get_payload())
+                        #print (part.get_payload())
                         hat.append(part.get_payload())
-                      
-                      #print(msg.get_payload())
-                      #hat=msg.get_payload()
 
 tree=" ".join(hat)
 test=tree
@@ -119,19 +113,23 @@ en_stop = set(nltk.corpus.stopwords.words('english'))
 text_data=[]  
 for word in test:
 	tokens= prepare_text_for_lda(test)
-	print("CAT")
+	#print("PREP")
 	text_data.append(tokens)
+	#print("DPREDP")
 
 
 
 """Now to split the message data into topics. Lets start with 5 and see if a definite "food" one appears"""
+print("blue")
 
 dictionary = corpora.Dictionary(text_data)
-
+dictionary.filter_extremes(no_below=15, no_above=0.1, keep_n= 100000)
 corpus = [dictionary.doc2bow(text) for text in text_data]
 
 pickle.dump(corpus, open('corpus.pkl', 'wb'))
 dictionary.save('dictionary.gensim')
+
+print("Yellow")
 
 NUM_TOPICS = 15
 ldamodel = gensim.models.ldamodel.LdaModel(corpus, num_topics = NUM_TOPICS, id2word=dictionary, passes=15)
