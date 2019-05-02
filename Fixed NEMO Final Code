@@ -116,3 +116,33 @@ for topic in topics:
     print(topic)
 
 print(time.clock()-start_time, "seconds")      
+
+#To test the code I will have my program pull random emails from my inbox (except for the first 100 used to create the topic sets) and print the first 3 that it finds that are classified as the "food" topic
+foodemail=[] #list of food-topic email ids
+n=15
+testlist=id_list
+del testlist[-n:] #remove most recent 15 ids, which were used to create the topics
+while len(foodemail)< 3: #continue until 3 emails have been found
+	testID=random.choice(testlist) #pull message text from random emails in the testlist
+	typ, data = mail.fetch(str(testID), '(RFC822)' )
+	for response_part in data:
+		if isinstance(response_part, tuple):
+                    msg = email.message_from_string(response_part[1].decode("utf-8",'ignore'))
+                    for part in msg.walk():
+                      if part.get_content_type() == 'text/plain': #see above for explination. Only wish to evaluate body text
+                        emailbody=part
+			vector= dictionary.doc2bow(prepare_text_for_lda(mailbody)) #format body text for WordNet seach and evaluation
+			for index, score in sorted(ldamodel[vector], key=lambda tup: -1*tup[1]):
+    				print("Score: {}\t Topic: {}".format(score, ldamodel.print_topic(index, 5)))
+				if emailbody.target== #TBD #if the designated email email classification matched the 'food' topic, save to list
+				foodemail.append(testID) 
+for i in foodemail: #in order to evaluate the accuracy of the model, print the body text of messages that the program classified as containing "food"
+typ, data = mail.fetch(str(i), '(RFC822)' )
+	for response_part in data:
+		if isinstance(response_part, tuple):
+                    msg = email.message_from_string(response_part[1].decode("utf-8",'ignore') )
+                    for part in msg.walk():
+                      if part.get_content_type() == 'text/plain':
+                        print (part.get_payload())
+                        hat.append(part.get_payload())
+print(foodemail) #print food email message ids so that other information can be further aquired, if desired (Sender, subject, ect.)
