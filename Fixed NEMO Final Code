@@ -1,0 +1,118 @@
+import time
+import imaplib
+import random
+import email
+import spacy
+import nltk
+import gensim
+from gensim import corpora
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.corpus import wordnet as wn
+from spacy.lang.en import English
+
+nltk.download('stopwords')
+nltk.download('wordnet')
+spacy.load('en_core_web_sm')
+
+
+
+#Relevent Functions:
+
+def tokenize(text): #ensure data from files is compatible in prepare_text_for_lda function below
+    lda_tokens = []
+    tokens = parser(text) #clean up file data to 
+    for token in tokens:
+        if token.orth_.isspace():
+            continue
+        elif token.like_url:
+            lda_tokens.append('URL')
+        elif token.orth_.startswith('@'):
+            lda_tokens.append('SCREEN_NAME')
+        else:
+            lda_tokens.append(token.lower_)
+    return lda_tokens
+
+def get_lemma(word): #convert words from input form to a form that can be found in WordNet
+    lemma = wn.morphy(word)
+    if lemma is None:
+        return word
+    else:
+        return lemma
+      
+def get_lemma2(word):
+    return WordNetLemmatizer().lemmatize(word) #convert words to their 'base' form (singular, present tense)
+
+def prepare_text_for_lda(text):
+    tokens = tokenize(text)
+    tokens = [token for token in tokens if len(token) > 4] #take out short word or abbriviations
+    tokens = [token for token in tokens if token not in en_stop] #take out words like 'the,' 'is,' and 'are'
+    tokens = [get_lemma(token) for token in tokens]
+    return tokens
+
+
+start_time=time.time()
+
+#Log into email
+ORG_EMAIL   = "@nd.edu"
+FROM_EMAIL  = "jburcham" + ORG_EMAIL
+FROM_PWD    = password = input("please enter password:") #logging on
+SMTP_SERVER = "imap.gmail.com" #import gmail
+SMTP_PORT   = 993
+ #establish cennection to email server
+mail = imaplib.IMAP4_SSL(SMTP_SERVER)
+mail.login(FROM_EMAIL,FROM_PWD)
+
+
+
+"""The next task is to download all of the emails and split the subject and message text into 'topic' using Gensium. This is known as topic modeling. So download the messages/subjects:"""
+
+mail.select('inbox')
+#now fetch email ids
+type, data = mail.search(None, 'ALL')
+mail_ids = data[0]
+id_list = mail_ids.split()
+#name the ends of the id list
+first_email_id = int(id_list[0])
+latest_email_id = int(id_list[-1])
+
+hat=[] 		#a running list for all the body text that will be run in the model
+for i in range(latest_email_id,latest_email_id-500, -1):
+	typ, data = mail.fetch(str(i), '(RFC822)' ) 	#for each email...
+	for response_part in data:
+		if isinstance(response_part, tuple):
+                    msg = email.message_from_string(response_part[1].decode("utf-8",'ignore') )		#...go through and decode the text in the message...
+                    for part in msg.walk():
+                      if part.get_content_type() == 'text/plain':	#...and if that part of the messaged is designated as 'body' text (not graphic, ect.)...
+                        hat.append(part.get_payload()) 		#...add the body text to the list 'hat'
+
+#tree=" ".join(hat) #join all the text from different messages into a single chunk of words
+
+test=hat #rename variable for use below
+
+"""Now use the gensium code. Source: susanli2016 https://github.com/susanli2016/Machine-Learning-with-Python/blob/master/topic_modeling_Gensim.ipynb"""
+
+parser = English()
+en_stop = set(nltk.corpus.stopwords.words('english')) 
+text_data=[]  
+for word in test:
+	tokens= prepare_text_for_lda(word)
+	text_data.append(tokens)
+	#print(len(tokens))
+
+print(len(text_data))
+
+"""Now to split the message data into topics. Lets start with 20 and see if a definite "food" one appears"""
+
+dictionary = corpora.Dictionary(text_data)
+dictionary.filter_extremes (no_above=0.2) #this would get rid of words that appeared too often
+corpus = [dictionary.doc2bow(text) for text in text_data]
+
+NUM_TOPICS = 20
+ldamodel = gensim.models.ldamodel.LdaModel(corpus, num_topics = NUM_TOPICS, id2word=dictionary, passes=15) #creating the topics
+ldamodel.save('model5.gensim') #saving the created model to use later
+
+topics = ldamodel.print_topics(num_words=8)
+for topic in topics:
+    print(topic)
+
+print(time.clock()-start_time, "seconds")      
